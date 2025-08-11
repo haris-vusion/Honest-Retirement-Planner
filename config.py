@@ -1,67 +1,65 @@
-APP_NAME = "FutureProof: Honest Retirement Planner"
+APP_NAME = "FutureProof — Retirement Wizard"
 
-# Default assumptions (UK-leaning; all "real" unless otherwise noted)
+CURRENCIES = {
+    "UK": "£",
+    "USA": "$",
+    "France": "€",
+    "Germany": "€",
+    "Australia": "A$",
+    "Custom": "¤"
+}
+
 DEFAULTS = {
-    "start_age": 30,
+    "country": "UK",
+    "age_now": 30,
     "retire_age": 60,
-    "end_age": 95,
-    "location": "UK",
-    "household_size": 1,
+    "plan_until_age": 95,
 
-    # Finances
-    "current_investable": 20_000,
-    "monthly_contribution": 800,
-    "contribution_growth_pct": 2.0,   # nominal per year
-    "salary": 60_000,
-    "salary_growth_pct": 2.5,         # nominal per year
+    # Finances today (in chosen currency)
+    "assets_now": 20_000,
+    "monthly_contrib": 800,
+    "contrib_growth_pct": 2.0,   # per year, nominal
 
-    # Asset mix (simple two-asset for v1)
-    "equity_alloc": 0.8,
-    "bond_alloc": 0.2,
-    "equity_real_return": 0.055,      # long run global real
-    "equity_vol": 0.18,
-    "bond_real_return": 0.01,
-    "bond_vol": 0.06,
-    "corr_equity_bond": -0.2,
-    "fees_annual": 0.002,             # 0.2%
-
-    # Inflation
-    "cpi": 0.025,                     # headline CPI
-    "category_drifts": {              # relative to CPI (positive = more expensive trend)
-        "rent": 0.01,
-        "food": 0.005,
-        "energy": 0.01,
-        "transport": 0.0,
-        "health": 0.01,
-        "entertainment": 0.0,
-        "electronics": -0.01
-    },
-
-    # Spending today (monthly, in today's money)
-    "spend_today": {
-        "rent": 1200,
+    # Spending today (monthly)
+    "basket_today": {
+        "rent_or_housing": 1200,
         "food": 350,
         "energy": 150,
         "transport": 250,
-        "health": 100,
+        "health_insurance": 100,
         "entertainment": 200,
-        "electronics": 50,
-        "other": 300
+        "electronics_gadgets": 50,
+        "other_everyday": 300
     },
 
-    # Drawdown
-    "headline_withdrawal_rule": "3% real",  # selectable
-    "guardrails": {                         # Guyton-Klinger lite
-        "initial_pct": 0.04,
-        "raise_cut": 0.1,                   # 10% bands
-        "max_raise": 0.10,
-        "max_cut": 0.10
+    # Inflation assumptions
+    "cpi": 2.5,   # headline CPI, %/yr
+    "drifts": {   # category drift *relative* to CPI
+        "rent_or_housing": 1.0,
+        "food": 0.5,
+        "energy": 1.0,
+        "transport": 0.0,
+        "health_insurance": 1.0,
+        "entertainment": 0.0,
+        "electronics_gadgets": -1.0,
+        "other_everyday": 0.0
     },
 
-    # Sims
-    "num_paths": 3,
+    # Investment assumptions (real)
+    "equity_alloc": 0.8,
+    "bond_alloc": 0.2,
+    "equity_mu": 5.5,   # % real
+    "equity_vol": 18.0, # %
+    "bond_mu": 1.0,     # % real
+    "bond_vol": 6.0,    # %
+    "corr": -0.2,
+    "fees_annual": 0.20, # % per year
+
+    # Withdrawal preferences
+    "rule": "3% real",         # 3% / 3.5% / 4%
+    "legacy_mode": "Spend to zero",  # or "Preserve capital"
+
+    # Simulation
+    "num_paths": 5,
     "seed": 123,
-
-    # Taxes (indexed with inflation in sim)
-    "uk_tax": True
 }
