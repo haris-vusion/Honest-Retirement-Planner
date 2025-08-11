@@ -93,7 +93,7 @@ fees = st.sidebar.slider(
 
 st.sidebar.header("Simulation")
 num_paths = st.sidebar.slider(
-    "How many futures to simulate", 20, 1000, DEFAULTS["num_paths"], 500,
+    "How many futures to simulate", 20, 1000, DEFAULTS["num_paths"], 20,
     help="More paths = smoother bands but slower. 2,000–5,000 is a good start."
 )
 seed = st.sidebar.number_input(
