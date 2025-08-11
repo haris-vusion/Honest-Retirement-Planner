@@ -21,8 +21,9 @@ class SimConfig:
     fees_annual: float                 # proportion
     cpi: float                         # annual CPI
 
-    # Spending goal
-    annual_spend_target_real_today: float  # target NET spend (today’s money)
+    # Dynamic spending target (today's money), per *month* across full timeline
+    # Length = months_total + 1 (index 0..months_total). Pre-retirement entries should be 0.
+    target_monthly_real_by_month: np.ndarray
 
     # Drawdown policy
     withdrawal_rule: str              # "3% real" / "3.5% real" / "4% real"
@@ -62,14 +63,8 @@ def run_monte_carlo(cfg: SimConfig) -> Tuple[dict, dict]:
     # Draw all monthly real returns for all paths up front
     draws = rng.normal(mu_m, sig_m, size=(cfg.num_paths, months_total))
 
-    # Tax bracket indexer
-    # We’ll keep a per-path factor that jumps yearly (it’s the same schedule for all paths)
-    yearly_tax_factors = np.cumprod(np.r_[1.0, np.repeat(1 + cpi_y, months_total//12)])
-    # Map month -> year factor quickly
     def tax_factor_for_month(m):
         return (1 + cpi_y) ** (m // 12)
-
-    target_monthly_real = cfg.annual_spend_target_real_today / 12.0
 
     for i in range(cfg.num_paths):
         w = cfg.current_investable
@@ -89,14 +84,19 @@ def run_monte_carlo(cfg: SimConfig) -> Tuple[dict, dict]:
 
             # Withdrawals after retirement start
             if m-1 >= retire_m:
-                # Decide desired NET income (real) for this month from policy
+                # Target NET income (real) for this month from the precomputed path
+                target_net_monthly_real = float(cfg.target_monthly_real_by_month[m])
+
+                # Rule-only income (before considering the basket)
                 rule_monthly_real = (cfg.current_investable * rule_pct) / 12.0
+
+                # Decide desired NET payment (real)
                 if cfg.spending_policy == "Meet target":
-                    desired_net_real = target_monthly_real
+                    desired_net_real = target_net_monthly_real
                 elif cfg.spending_policy == "Rule only":
                     desired_net_real = rule_monthly_real
                 else:  # "Lower of rule & target"
-                    desired_net_real = min(target_monthly_real, rule_monthly_real)
+                    desired_net_real = min(target_net_monthly_real, rule_monthly_real)
 
                 # Legacy mode cap (preserve initial real principal)
                 if cfg.legacy_mode == "Preserve capital (real)":
@@ -105,16 +105,14 @@ def run_monte_carlo(cfg: SimConfig) -> Tuple[dict, dict]:
 
                 # Convert desired NET to required GROSS using indexed tax
                 sys = index_tax(SYSTEMS[cfg.country], tax_factor_for_month(m))
-                annual_net_real  = desired_net_real * 12.0
+                annual_net_real   = desired_net_real * 12.0
                 annual_gross_real = gross_for_net(annual_net_real, sys)
+
                 monthly_gross_real = min(w, annual_gross_real / 12.0)
-
-                # If portfolio is too small, you’ll withdraw less than desired (shortfall)
-                w = max(0.0, w - monthly_gross_real)
-
-                # Record delivered *net* (never greater than gross)
-                # We assume we solved gross_for_net correctly; if capped by cash, net is capped equally.
+                # Record delivered net (cap by gross if cash-limited)
                 delivered_net = min(monthly_gross_real, annual_net_real/12.0)
+
+                w = max(0.0, w - monthly_gross_real)
                 net_wd[i, m] = delivered_net
 
             wealth[i, m] = w
@@ -123,19 +121,24 @@ def run_monte_carlo(cfg: SimConfig) -> Tuple[dict, dict]:
     ages = cfg.current_age + np.arange(months_total+1)/12.0
     pct = lambda X, q: np.percentile(X, q, axis=0)
 
-    # Success: meet target for ≥ success_cover_pct of retirement months, AND finish ≥ 0.
+    # Success: meet *basket target* for ≥ success_cover_pct of retirement months, AND finish ≥ 0.
     success_flags = np.zeros(cfg.num_paths, dtype=bool)
     cover_ratios  = np.zeros(cfg.num_paths, dtype=np.float64)
     if months_total > retire_m:
-        needed = target_monthly_real
-        check = net_wd[:, retire_m:] >= (needed - 1e-9)
-        cover_ratios = check.mean(axis=1)  # fraction of retirement months covered
+        target_slice = cfg.target_monthly_real_by_month[retire_m:]
+        # If target is zero somewhere (shouldn't be), treat as covered
+        target_eps = np.maximum(target_slice, 1e-12)
+        check = net_wd[:, retire_m:] >= (target_slice - 1e-9)
+        cover_ratios = check.mean(axis=1)
         finish_ok = wealth[:, -1] >= 0.0
         success_flags = (cover_ratios >= cfg.success_cover_pct) & finish_ok
     else:
-        # degenerate case: retire age >= plan end
         success_flags = wealth[:, -1] >= 0.0
         cover_ratios[:] = 1.0
+
+    # Some reporting helpers
+    retire_idx = retire_m
+    target_annual_real_at_retire = float(cfg.target_monthly_real_by_month[retire_idx] * 12.0)
 
     summary = {
         "ages": ages,
@@ -146,7 +149,8 @@ def run_monte_carlo(cfg: SimConfig) -> Tuple[dict, dict]:
         "coverage_p5":  float(np.percentile(cover_ratios, 5)),
         "coverage_p95": float(np.percentile(cover_ratios, 95)),
         "retire_age": cfg.retire_age,
-        "target_annual_real": cfg.annual_spend_target_real_today
+        "target_annual_real": target_annual_real_at_retire,
+        "target_annual_real_series": cfg.target_monthly_real_by_month * 12.0  # shape (months+1,)
     }
     detail = {"wealth": wealth, "net_wd": net_wd}
     return summary, detail
