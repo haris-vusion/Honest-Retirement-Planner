@@ -26,56 +26,100 @@ with st.expander("How this app works (30 seconds)"):
 
 # ---------------- Sidebar (inputs) ----------------
 st.sidebar.header("Your profile")
-current_age = st.sidebar.number_input("Your age", min_value=18, max_value=85, value=DEFAULTS["current_age"],
-    help="How old you are today. We use this with your retirement age to set the timeline.")
-retire_age = st.sidebar.number_input("When do you want to retire?", min_value=current_age+1, max_value=85, value=DEFAULTS["retire_age"],
-    help="Pick the age you’d like to stop full-time work.")
-plan_end_age = st.sidebar.number_input("Plan until age", min_value=retire_age+5, max_value=105, value=DEFAULTS["plan_end_age"],
-    help="We simulate until this age. It’s your longevity buffer.")
+current_age = st.sidebar.number_input(
+    "Your age", min_value=18, max_value=85, value=DEFAULTS["current_age"],
+    help="How old you are today."
+)
+retire_age = st.sidebar.number_input(
+    "When do you want to retire?", min_value=current_age+1, max_value=85, value=DEFAULTS["retire_age"],
+    help="Pick the age you’d like to stop full-time work."
+)
+plan_end_age = st.sidebar.number_input(
+    "Plan until age", min_value=retire_age+5, max_value=105, value=DEFAULTS["plan_end_age"],
+    help="We simulate until this age. It’s your longevity buffer."
+)
 
-country = st.sidebar.selectbox("Country for tax", list(SYSTEMS.keys()), index=list(SYSTEMS.keys()).index(DEFAULTS["country"]),
-    help="We use a simplified version of your country’s tax brackets. Thresholds rise with inflation each year.")
+country = st.sidebar.selectbox(
+    "Country for tax", list(SYSTEMS.keys()),
+    index=list(SYSTEMS.keys()).index(DEFAULTS["country"]),
+    help="We use a simplified version of your country’s tax brackets, indexed with inflation."
+)
 
 st.sidebar.header("Money today")
-current_investable = st.sidebar.number_input("Investable assets today", min_value=0, value=DEFAULTS["current_investable"], step=1000,
-    help="Cash+investments that will fund retirement. Exclude your primary home for now.")
-monthly_contrib = st.sidebar.number_input("Monthly contribution", min_value=0, value=DEFAULTS["monthly_contrib"], step=50,
-    help="How much you add each month before retirement.")
-contrib_growth = st.sidebar.slider("Contribution growth (nominal, %/yr)", 0.0, 10.0, DEFAULTS["contrib_growth_nominal_pct"], 0.1,
-    help="Rough annual pay rise or savings increase. Nominal means before inflation.")
+current_investable = st.sidebar.number_input(
+    "Investable assets today", min_value=0, value=DEFAULTS["current_investable"], step=1000,
+    help="Cash+investments that will fund retirement. Exclude your main home."
+)
+monthly_contrib = st.sidebar.number_input(
+    "Monthly contribution", min_value=0, value=DEFAULTS["monthly_contrib"], step=50,
+    help="How much you add each month before retirement."
+)
+contrib_growth = st.sidebar.slider(
+    "Contribution growth (nominal, %/yr)", 0.0, 10.0, DEFAULTS["contrib_growth_nominal_pct"], 0.1,
+    help="Rough annual pay rise or savings increase. Nominal = before inflation."
+)
 
 st.sidebar.header("Inflation")
-cpi = st.sidebar.slider("Headline inflation (%/yr)", 0.0, 10.0, DEFAULTS["headline_cpi"]*100, 0.1, help="We inflate prices by this rate.")/100.0
+cpi = st.sidebar.slider(
+    "Headline inflation (%/yr)", 0.0, 10.0, DEFAULTS["headline_cpi"]*100, 0.1,
+    help="We inflate prices by this rate."
+)/100.0
 
 st.sidebar.header("Expected returns")
-preset_name = st.sidebar.selectbox("Choose a preset (optional)", ["Custom"] + list(PRESETS.keys()), help="Quick-start estimates you can override.")
+preset_name = st.sidebar.selectbox("Choose a preset (optional)", ["Custom"] + list(PRESETS.keys()),
+    help="Quick-start estimates you can override."
+)
 if preset_name != "Custom":
     mu_default = PRESETS[preset_name]["real_mu"]
     vol_default = PRESETS[preset_name]["vol"]
 else:
     mu_default, vol_default = DEFAULTS["exp_real_return"], DEFAULTS["volatility"]
 
-exp_real_return = st.sidebar.number_input("Expected real return (μ, per year)", value=float(mu_default), step=0.005, format="%.3f",
-    help="Average return after inflation. Example: 0.05 means ~5% above inflation per year.")
-volatility = st.sidebar.number_input("Volatility (σ, per year)", value=float(vol_default), step=0.01, format="%.2f",
-    help="How bumpy returns are. Higher = wider swings, bigger sequence risk.")
-fees = st.sidebar.slider("All-in fees (%/yr)", 0.0, 2.0, DEFAULTS["fees_annual"]*100, 0.05,
-    help="Fund + platform + advice. Lower is better!")/100.0
+exp_real_return = st.sidebar.number_input(
+    "Expected real return (μ, per year)", value=float(mu_default), step=0.005, format="%.3f",
+    help="Average return after inflation. Example: 0.05 = ~5% real per year."
+)
+volatility = st.sidebar.number_input(
+    "Volatility (σ, per year)", value=float(vol_default), step=0.01, format="%.2f",
+    help="How bumpy returns are. Higher = wider swings."
+)
+fees = st.sidebar.slider(
+    "All-in fees (%/yr)", 0.0, 2.0, DEFAULTS["fees_annual"]*100, 0.05,
+    help="Fund + platform + advice, combined."
+)/100.0
 
 st.sidebar.header("Simulation")
-num_paths = st.sidebar.slider("How many futures to simulate", 500, 20000, DEFAULTS["num_paths"], 500,
-    help="More paths = smoother bands but slower. Start with 2,000–5,000.")
-seed = st.sidebar.number_input("Random seed (-1 = random)", value=DEFAULTS["seed"], help="Set -1 for a fresh random run.")
+num_paths = st.sidebar.slider(
+    "How many futures to simulate", 500, 20000, DEFAULTS["num_paths"], 500,
+    help="More paths = smoother bands but slower. 2,000–5,000 is a good start."
+)
+seed = st.sidebar.number_input("Random seed (-1 = random)", value=DEFAULTS["seed"],
+    help="Set -1 for a fresh random run each time."
+)
 
-st.sidebar.header("Drawdown style")
-rule_choice = st.sidebar.selectbox("Rule of thumb", ["3% real", "3.5% real", "4% real"], index=["3% real","3.5% real","4% real"].index(DEFAULTS["withdrawal_rule"]),
-    help="This sets a ‘safe-ish’ starting spend as a % of your pot, adjusted for inflation.")
-legacy_mode = st.sidebar.selectbox("Legacy", ["Spend to zero", "Preserve capital (real)"], index=["Spend to zero","Preserve capital (real)"].index(DEFAULTS["legacy_mode"]),
-    help="Spend to zero: aim to use up your pot by plan end. Preserve capital: keep your initial pot intact in *today’s money*.")
+st.sidebar.header("Drawdown & success")
+rule_choice = st.sidebar.selectbox(
+    "Rule of thumb", ["3% real", "3.5% real", "4% real"], index=0,
+    help="Rule-based starting spend as % of your pot (real)."
+)
+spending_policy = st.sidebar.selectbox(
+    "How to set your retirement income",
+    ["Meet target", "Rule only", "Lower of rule & target"],
+    help="‘Meet target’ tries to fund your basket; ‘Rule only’ pays the % regardless; ‘Lower of’ is conservative."
+)
+legacy_mode = st.sidebar.selectbox(
+    "Legacy", ["Spend to zero", "Preserve capital (real)"], index=0,
+    help="Preserve capital keeps your initial pot intact in today’s money."
+)
+success_cover = st.sidebar.slider(
+    "What counts as success? (% of retirement months you meet the target)",
+    50, 100, 90, 5,
+    help="Example: 90% means you meet your target income in at least 90% of retirement months and don’t run out."
+)/100.0
 
-# ---------------- Costs (simple English) ----------------
+# ---------------- Costs (same as before) ----------------
 st.markdown("### 1) Your future cost of living")
-helptext("We project each part of your budget to your retirement date. You can tweak the numbers; they’re just starting points.")
+helptext("We project each part of your budget to your retirement date. Tweak as needed.")
 
 spend_today = DEFAULTS["spend_today"].copy()
 cols = st.columns(3)
@@ -85,7 +129,7 @@ for i, cat in enumerate(cats):
         spend_today[cat] = st.number_input(
             f"{cat.capitalize()} (monthly, today’s money)",
             min_value=0, value=int(spend_today[cat]), step=25,
-            help=f"How much you spend on {cat} each month in today’s money.",
+            help=f"How much you spend on {cat} each month today.",
             key=f"sp_{cat}"
         )
 
@@ -97,12 +141,11 @@ with st.expander("Advanced: which things outpace inflation? (optional)"):
             drifts[cat] = st.number_input(
                 f"{cat.capitalize()} drift (±%/yr vs CPI)",
                 value=float(drift*100), step=0.1, format="%.1f",
-                help=f"If {cat} tends to rise faster than CPI, put a positive number. If it gets cheaper over time, use negative.",
+                help=f"If {cat} tends to rise faster than CPI, use a positive number; if cheaper over time, negative.",
                 key=f"dr_{cat}"
             )/100.0
 
 years_to_retire = max(0, retire_age - current_age)
-from costs import project_costs, basket
 proj = project_costs(spend_today, cpi, drifts, years_to_retire)
 b = basket(proj, years_to_retire)
 
@@ -112,7 +155,7 @@ cols_kpi[1].markdown(f"<div class='card'><div class='caption'>Monthly basket in 
 cols_kpi[2].markdown(f"<div class='card'><div class='caption'>Annual basket (nominal)</div><div class='kpi'>£{b['annual_nominal']:,.0f}</div></div>", unsafe_allow_html=True)
 cols_kpi[3].markdown(f"<div class='card'><div class='caption'>Annual basket in today’s money</div><div class='kpi'>£{b['annual_real_today']:,.0f}</div></div>", unsafe_allow_html=True)
 
-# Mini chart of 3 categories
+# Category preview chart (unchanged)
 figC = go.Figure()
 for cat in ["housing", "food", "energy"]:
     sub = proj[proj["category"] == cat]
@@ -120,9 +163,9 @@ for cat in ["housing", "food", "energy"]:
 figC.update_layout(title="Selected categories up to retirement (annual nominal)", xaxis_title="Years from now", yaxis_title="Per year", hovermode="x unified", margin=dict(l=30,r=20,t=60,b=30))
 st.plotly_chart(figC, use_container_width=True)
 
-# ---------------- Run simulation (on click) ----------------
+# ---------------- Run simulation (AUTO) ----------------
 st.markdown("### 2) Retirement odds & income")
-helptext("We run many futures (Monte Carlo). The shaded bands show best/worst luck ranges, in **today’s money**.")
+helptext("We simulate many possible futures (Monte Carlo). All values below are in **today’s money**.")
 
 cfg = SimConfig(
     current_age=current_age,
@@ -138,9 +181,11 @@ cfg = SimConfig(
     annual_spend_target_real_today=b["annual_real_today"],
     withdrawal_rule=rule_choice,
     legacy_mode=legacy_mode,
+    spending_policy=spending_policy,
     country=country,
     num_paths=num_paths,
-    seed=None if seed == -1 else seed
+    seed=None if seed == -1 else seed,
+    success_cover_pct=success_cover
 )
 
 @st.cache_data(show_spinner=False)
@@ -148,20 +193,29 @@ def run_cached(cfg_dict):
     cfg_obj = SimConfig(**cfg_dict)
     return run_monte_carlo(cfg_obj)
 
-run = st.button("Run simulation", type="primary")
-if not run:
-    st.info("Set your inputs, then click **Run simulation**.")
-    st.stop()
-
 with st.spinner("Simulating futures…"):
     summary, detail = run_cached(cfg.__dict__)
 
-# KPIs
+# KPIs (show coverage rule used)
 c1,c2,c3 = st.columns(3)
-c1.markdown(f"<div class='card'><div class='caption'>Success probability</div><div class='kpi'>{summary['success_rate']:.1f}%</div><div class='caption'>Meet plan & finish ≥ 0</div></div>", unsafe_allow_html=True)
+c1.markdown(
+    f"<div class='card'><div class='caption'>Success probability "
+    f"(meets target ≥ {int(success_cover*100)}% of retirement months)</div>"
+    f"<div class='kpi'>{summary['success_rate']:.1f}%</div></div>",
+    unsafe_allow_html=True
+)
 rule_map = {"3% real":0.03,"3.5% real":0.035,"4% real":0.04}
-c2.markdown(f"<div class='card'><div class='caption'>Rule-based starting income</div><div class='kpi'>£{current_investable*rule_map[rule_choice]:,.0f}/yr</div><div class='caption'>Real, before tax</div></div>", unsafe_allow_html=True)
-c3.markdown(f"<div class='card'><div class='caption'>Basket at retirement (real)</div><div class='kpi'>£{b['annual_real_today']:,.0f}/yr</div><div class='caption'>Target net spend</div></div>", unsafe_allow_html=True)
+c2.markdown(
+    f"<div class='card'><div class='caption'>Rule-based starting income</div>"
+    f"<div class='kpi'>£{current_investable*rule_map[rule_choice]:,.0f}/yr</div>"
+    f"<div class='caption'>Real, before tax</div></div>",
+    unsafe_allow_html=True
+)
+c3.markdown(
+    f"<div class='card'><div class='caption'>Basket at retirement (real)</div>"
+    f"<div class='kpi'>£{b['annual_real_today']:,.0f}/yr</div><div class='caption'>Target net spend</div></div>",
+    unsafe_allow_html=True
+)
 
 # Wealth bands
 figW = go.Figure()
@@ -172,11 +226,14 @@ figW.add_vline(x=retire_age, line_dash="dash", line_color="green")
 figW.update_layout(title="Portfolio wealth (real)", xaxis_title="Age", yaxis_title="£ (today’s money)", hovermode="x unified", margin=dict(l=30,r=20,t=60,b=30))
 st.plotly_chart(figW, use_container_width=True)
 
-# Income bands
+# Income bands + target line
 figI = go.Figure()
 figI.add_trace(go.Scatter(x=summary["ages"], y=summary["wd_p50"], mode="lines", name="Median net income (annual)"))
 figI.add_trace(go.Scatter(x=summary["ages"], y=summary["wd_p95"], mode="lines", name="p95", line=dict(dash="dot")))
 figI.add_trace(go.Scatter(x=summary["ages"], y=summary["wd_p5"],  mode="lines", name="p5",  line=dict(dash="dot"), fill="tonexty"))
+# Target line from retirement onward
+target_y = np.where(summary["ages"] >= retire_age, summary["target_annual_real"], None)
+figI.add_trace(go.Scatter(x=summary["ages"], y=target_y, mode="lines", name="Target income", line=dict(dash="dash")))
 figI.add_vline(x=retire_age, line_dash="dash", line_color="green")
 figI.update_layout(title="Retirement income (after tax, real)", xaxis_title="Age", yaxis_title="£ per year (today’s money)", hovermode="x unified", margin=dict(l=30,r=20,t=60,b=30))
 st.plotly_chart(figI, use_container_width=True)
