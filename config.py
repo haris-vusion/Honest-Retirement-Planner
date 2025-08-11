@@ -49,7 +49,7 @@ DEFAULTS = {
     "legacy_mode": "Spend to zero",  # or Preserve capital (real)
 
     # Monte Carlo
-    "num_paths": 5,
+    "num_paths": 10,
     "seed": 42
 }
 
