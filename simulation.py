@@ -1,143 +1,112 @@
-from dataclasses import dataclass
-from typing import Tuple, Optional
+from __future__ import annotations
+
 import numpy as np
-import pandas as pd
-from tax_models import TaxSpec, index_spec, gross_needed_for_net
+from dataclasses import dataclass, replace
+from taxes import SYSTEMS, indexed as index_tax, gross_for_net
+from typing import Tuple
 
 @dataclass
 class SimConfig:
-    # Ages
-    age_now: int
-    retire_age: float
-    plan_until_age: int
-
-    # Money now
-    assets_now: float
+    current_age: int
+    retire_age: int
+    plan_end_age: int
+    current_investable: float
     monthly_contrib: float
-    contrib_growth_pct: float  # nominal %/yr
-
-    # Returns (real)
-    equity_alloc: float
-    bond_alloc: float
-    equity_mu: float        # %/yr real
-    equity_vol: float       # %/yr
-    bond_mu: float
-    bond_vol: float
-    corr: float
-    fees_annual: float      # %/yr
-
-    # Inflation
-    cpi_pct: float          # %/yr
-
-    # Spending target (annual, in today's money)
-    target_annual_real: float
-
-    # Withdrawal
-    rule_pct: float         # 0.03 / 0.035 / 0.04
-    preserve_capital: bool  # legacy mode
-
-    # Tax
-    tax_spec_baseline: TaxSpec
-
-    # Sims
+    contrib_growth_nominal_pct: float
+    exp_real_return: float
+    volatility: float
+    fees_annual: float
+    cpi: float
+    annual_spend_target_real_today: float
+    withdrawal_rule: str               # "3% real" / "3.5% real" / "4% real"
+    legacy_mode: str                   # "Spend to zero" or "Preserve capital (real)"
+    country: str
     num_paths: int
-    seed: Optional[int]
+    seed: int | None
 
-def _monthly_from_annual(mu: float, vol: float):
-    mu_m = mu / 12.0
-    vol_m = vol / np.sqrt(12.0)
-    return mu_m, vol_m
+def _monthly_params(mu_a, sigma_a):
+    mu_m = mu_a/12.0
+    sigma_m = sigma_a/np.sqrt(12.0)
+    return mu_m, sigma_m
 
-def _draw_monthly_returns(cfg: SimConfig, months: int, rng: np.random.Generator):
-    mu_e_m, vol_e_m = _monthly_from_annual(cfg.equity_mu/100.0, cfg.equity_vol/100.0)
-    mu_b_m, vol_b_m = _monthly_from_annual(cfg.bond_mu/100.0, cfg.bond_vol/100.0)
-    cov = np.array([[vol_e_m**2, cfg.corr*vol_e_m*vol_b_m],
-                    [cfg.corr*vol_e_m*vol_b_m, vol_b_m**2]])
-    draws = rng.multivariate_normal(mean=[mu_e_m, mu_b_m], cov=cov, size=months)
-    return draws[:,0], draws[:,1]
+def run_monte_carlo(cfg: SimConfig) -> Tuple[dict, dict]:
+    months = int((cfg.plan_end_age - cfg.current_age) * 12)
+    retire_m = int((cfg.retire_age - cfg.current_age) * 12)
+    mu_m, sig_m = _monthly_params(cfg.exp_real_return, cfg.volatility)
+    fees_m = (1 - cfg.fees_annual) ** (1/12.0)
+    cpi_y = cfg.cpi
+    cpi_m = (1 + cfg.cpi) ** (1/12.0)
 
-def run_monte_carlo(cfg: SimConfig) -> Tuple[dict, pd.DataFrame]:
-    months = int((cfg.plan_until_age - cfg.age_now) * 12)
-    retire_m = int((cfg.retire_age - cfg.age_now) * 12)
-    fees_m = (1 - cfg.fees_annual/100.0) ** (1/12.0)
-    cpi_m = (1 + cfg.cpi_pct/100.0) ** (1/12.0)
-    rng_master = np.random.default_rng(cfg.seed)
+    rng = np.random.default_rng(cfg.seed)
+    # Pre-allocate (num_paths, months+1)
+    wealth = np.empty((cfg.num_paths, months+1), dtype=np.float64)
+    net_wd = np.zeros((cfg.num_paths, months+1), dtype=np.float64)
+    retired = np.zeros((cfg.num_paths, months+1), dtype=bool)
 
-    wealth = np.empty((cfg.num_paths, months+1), dtype=float)
-    wd_net = np.empty((cfg.num_paths, months+1), dtype=float)
-    success = 0
+    # Tax indexing factor each year
+    tax_factor = 1.0
+
+    # Withdrawal rule percent
+    rule_map = {"3% real": 0.03, "3.5% real": 0.035, "4% real": 0.04}
+    rule_pct = rule_map.get(cfg.withdrawal_rule, 0.03)
+
+    draws = rng.normal(mu_m, sig_m, size=(cfg.num_paths, months))  # real monthly returns
 
     for i in range(cfg.num_paths):
-        prng = np.random.default_rng(int(rng_master.integers(0, 2**31 - 1)))
-        e_r, b_r = _draw_monthly_returns(cfg, months, prng)
-
-        w = np.zeros(months+1, dtype=float)
-        w[0] = cfg.assets_now
-        wd = np.zeros(months+1, dtype=float)
-
+        w = cfg.current_investable
         contrib = cfg.monthly_contrib
-        tax_factor = 1.0
-        rule_monthly_real = (cfg.assets_now * cfg.rule_pct) / 12.0
+        wealth[i, 0] = w
+        retired[i, retire_m:] = True
+        initial_real_principal = cfg.current_investable
 
         for m in range(1, months+1):
-            # contributions (nominal growth; convert to real)
-            if m <= retire_m:
-                contrib *= (1 + cfg.contrib_growth_pct/100.0) ** (1/12.0)
+            # contributions until retirement (nominal -> convert to real by dividing CPI growth)
+            if m-1 < retire_m:
+                contrib *= (1 + cfg.contrib_growth_nominal_pct/100.0) ** (1/12.0)
                 real_contrib = contrib / (cpi_m ** m)
-            else:
-                real_contrib = 0.0
+                w += real_contrib
 
-            w[m-1] += real_contrib
+            # portfolio growth (real) and fees
+            w = max(0.0, w * (1 + draws[i, m-1]) * fees_m)
 
-            # portfolio real returns + fees
-            port_r = cfg.equity_alloc*e_r[m-1] + cfg.bond_alloc*b_r[m-1]
-            w[m] = max(0.0, w[m-1]*(1 + port_r))
-            w[m] *= fees_m
-
-            # index tax annually
+            # bump tax brackets each *year*
             if m % 12 == 0:
-                tax_factor *= (1 + cfg.cpi_pct/100.0)
+                tax_factor *= (1 + cpi_y)
 
-            # withdrawals after retirement
-            if m > retire_m:
-                basket_monthly_real = (cfg.target_annual_real / 12.0)
-                desired_real_net = min(basket_monthly_real, rule_monthly_real)
+            # retirement withdrawals
+            if m-1 >= retire_m:
+                # spending target (real, net of tax)
+                basket_monthly_real = cfg.annual_spend_target_real_today / 12.0
+                rule_monthly_real = (cfg.current_investable * rule_pct) / 12.0
 
-                if cfg.preserve_capital:
-                    allowable = max(0.0, w[m] - w[0])
-                    desired_real_net = min(desired_real_net, allowable)
+                desired_net_real = min(basket_monthly_real, rule_monthly_real)
 
-                spec = index_spec(cfg.tax_spec_baseline, tax_factor)
-                gross_annual_real = gross_needed_for_net(desired_real_net*12.0, spec)
-                gross_month_real = min(gross_annual_real/12.0, w[m])
+                if cfg.legacy_mode == "Preserve capital (real)":
+                    # Cap so real principal doesn't fall below starting point
+                    allowable = max(0.0, w - initial_real_principal)
+                    desired_net_real = min(desired_net_real, allowable)
 
-                w[m] = max(0.0, w[m] - gross_month_real)
-                wd[m] = desired_real_net  # store net (real)
+                # Convert to gross using current country's indexed tax
+                sys = index_tax(SYSTEMS[cfg.country], tax_factor)
+                annual_net_real = desired_net_real * 12.0
+                annual_gross_real = gross_for_net(annual_net_real, sys)
+                monthly_gross_real = min(w, annual_gross_real / 12.0)
+                monthly_net_real = min(monthly_gross_real, annual_net_real / 12.0)
 
-        if w[-1] > 0 and np.any(wd[retire_m+1:] > 0):
-            success += 1
+                w = max(0.0, w - monthly_gross_real)
+                net_wd[i, m] = monthly_net_real
 
-        wealth[i, :] = w
-        wd_net[i, :] = wd
+            wealth[i, m] = w
 
-    ages = cfg.age_now + np.arange(months+1)/12.0
-    pct = lambda a,q: np.percentile(a, q, axis=0)
+    # Summaries
+    ages = cfg.current_age + np.arange(months+1)/12.0
+    pct = lambda X, q: np.percentile(X, q, axis=0)
+    success = (wealth[:, -1] >= 0.0) & (np.any(net_wd > 0, axis=1))
     summary = {
         "ages": ages,
-        "success_rate": 100.0 * success / cfg.num_paths,
-        "wealth_p5":  pct(wealth, 5),
-        "wealth_p50": pct(wealth, 50),
-        "wealth_p95": pct(wealth, 95),
-        "wd_p5":      pct(wd_net, 5),
-        "wd_p50":     pct(wd_net, 50),
-        "wd_p95":     pct(wd_net, 95),
+        "success_rate": 100.0 * success.mean(),
+        "wealth_p5": pct(wealth, 5),  "wealth_p50": pct(wealth, 50),  "wealth_p95": pct(wealth, 95),
+        "wd_p5": pct(net_wd, 5)*12,   "wd_p50": pct(net_wd, 50)*12,  "wd_p95": pct(net_wd, 95)*12,  # annualized
     }
-
-    series = pd.DataFrame({
-        "age": ages,
-        "real_portfolio_median": summary["wealth_p50"],
-        "real_net_withdrawal_median": summary["wd_p50"],
-    })
-
-    return summary, series
-
+    detail = {"wealth": wealth, "net_wd": net_wd}
+    return summary, detail

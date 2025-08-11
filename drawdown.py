@@ -1,5 +1,5 @@
 import numpy as np
-from tax_models import TaxBands, net_from_gross, gross_needed_for_net
+from taxes import TaxBands, net_from_gross, gross_needed_for_net
 
 def static_real_rule(portfolio: float, rule_pct: float, price_index: float, start_index: float) -> float:
     """

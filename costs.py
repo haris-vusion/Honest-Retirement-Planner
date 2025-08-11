@@ -1,20 +1,15 @@
 import numpy as np
 import pandas as pd
 
-def project_costs(basket_today: dict, cpi_pct: float, drifts_pct: dict, years: int) -> pd.DataFrame:
-    """
-    Inflate each category to each future year.
-    Returns columns: year, category, monthly_nominal, monthly_real_today, annual_nominal, annual_real_today
-    """
-    cpi = cpi_pct / 100.0
+def project_costs(spend_today: dict, cpi: float, drifts: dict, years: int) -> pd.DataFrame:
     idx = np.arange(years + 1)
     rows = []
-    for cat, m_now in basket_today.items():
-        drift = (drifts_pct.get(cat, 0.0) / 100.0)
-        nominal_mult = (1 + cpi + drift) ** idx
-        real_div = (1 + cpi) ** idx
-        monthly_nominal = m_now * nominal_mult
-        monthly_real = monthly_nominal / real_div
+    for cat, monthly_now in spend_today.items():
+        drift = drifts.get(cat, 0.0)
+        nom_mult = (1 + (cpi + drift)) ** idx
+        real_mult = (1 + cpi) ** idx
+        monthly_nominal = monthly_now * nom_mult
+        monthly_real = monthly_nominal / real_mult
         rows.append(pd.DataFrame({
             "year": idx,
             "category": cat,
@@ -26,11 +21,11 @@ def project_costs(basket_today: dict, cpi_pct: float, drifts_pct: dict, years: i
     out["annual_real_today"] = out["monthly_real_today"] * 12
     return out
 
-def summarize_year(df: pd.DataFrame, year: int) -> dict:
-    sub = df[df["year"] == year]
+def basket(df: pd.DataFrame, year: int) -> dict:
+    v = df[df["year"] == year]
     return {
-        "monthly_nominal": float(sub["monthly_nominal"].sum()),
-        "monthly_real_today": float(sub["monthly_real_today"].sum()),
-        "annual_nominal": float(sub["annual_nominal"].sum()),
-        "annual_real_today": float(sub["annual_real_today"].sum()),
+        "monthly_nominal": float(v["monthly_nominal"].sum()),
+        "monthly_real_today": float(v["monthly_real_today"].sum()),
+        "annual_nominal": float(v["annual_nominal"].sum()),
+        "annual_real_today": float(v["annual_real_today"].sum()),
     }
