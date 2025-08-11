@@ -90,7 +90,7 @@ def run_monte_carlo(cfg: SimConfig) -> Tuple[dict, dict]:
                 # Rule-only income (before considering the basket)
                 rule_monthly_real = (cfg.current_investable * rule_pct) / 12.0
 
-                # Decide desired NET payment (real)
+                # Withdrawal behaviour (can still follow rule), but...
                 if cfg.spending_policy == "Meet target":
                     desired_net_real = target_net_monthly_real
                 elif cfg.spending_policy == "Rule only":
@@ -98,6 +98,8 @@ def run_monte_carlo(cfg: SimConfig) -> Tuple[dict, dict]:
                 else:  # "Lower of rule & target"
                     desired_net_real = min(target_net_monthly_real, rule_monthly_real)
 
+                # ...AND for success metric, always compare to basket
+                success_target_monthly_real = target_net_monthly_real
                 # Legacy mode cap (preserve initial real principal)
                 if cfg.legacy_mode == "Preserve capital (real)":
                     allowable = max(0.0, w - initial_real_principal)
@@ -126,8 +128,6 @@ def run_monte_carlo(cfg: SimConfig) -> Tuple[dict, dict]:
     cover_ratios  = np.zeros(cfg.num_paths, dtype=np.float64)
     if months_total > retire_m:
         target_slice = cfg.target_monthly_real_by_month[retire_m:]
-        # If target is zero somewhere (shouldn't be), treat as covered
-        target_eps = np.maximum(target_slice, 1e-12)
         check = net_wd[:, retire_m:] >= (target_slice - 1e-9)
         cover_ratios = check.mean(axis=1)
         finish_ok = wealth[:, -1] >= 0.0
