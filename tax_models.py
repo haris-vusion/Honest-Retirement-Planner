@@ -1,24 +1,22 @@
 from dataclasses import dataclass, field
 from typing import List, Optional
 import math
-import numpy as np
 import pandas as pd
 
-# ----- Data structures -----
+# ---------- Data structures ----------
 @dataclass
 class Bracket:
-    upper: float  # upper limit of this bracket (inclusive). Use math.inf for top.
-    rate: float   # e.g. 0.20
+    upper: float  # upper limit of bracket; use math.inf for top
+    rate: float   # e.g., 0.20
 
 @dataclass
 class TaxSpec:
     name: str
-    allowance: float = 0.0               # personal allowance / standard deduction
+    allowance: float = 0.0
     brackets: List[Bracket] = field(default_factory=list)
-    # Optional extras
-    taper_start: Optional[float] = None  # UK: PA taper starts here
-    taper_ratio: float = 0.5             # £1 PA lost per £2 over -> 0.5
-    medicare_levy: float = 0.0           # AU: add levy on taxable
+    taper_start: Optional[float] = None  # UK PA taper start
+    taper_ratio: float = 0.5             # £1 PA lost per £2 => 0.5
+    medicare_levy: float = 0.0           # AU levy applied to taxable
 
 def _apply_taper(gross: float, allowance: float, spec: TaxSpec) -> float:
     if spec.taper_start is None:
@@ -31,7 +29,6 @@ def _apply_taper(gross: float, allowance: float, spec: TaxSpec) -> float:
 def tax_due(gross: float, spec: TaxSpec) -> float:
     if gross <= 0:
         return 0.0
-    # Adjust allowance for taper if any
     eff_allow = _apply_taper(gross, spec.allowance, spec)
     taxable = max(0.0, gross - eff_allow)
     last_upper = 0.0
@@ -70,10 +67,10 @@ def index_spec(spec: TaxSpec, factor: float) -> TaxSpec:
         brackets=[Bracket(upper=idx(b.upper), rate=b.rate) for b in spec.brackets],
         taper_start=(None if spec.taper_start is None else spec.taper_start * factor),
         taper_ratio=spec.taper_ratio,
-        medicare_levy=spec.medicare_levy
+        medicare_levy=spec.medicare_levy,
     )
 
-# ----- Defaults (baseline year; user can edit) -----
+# ---------- Presets (baseline; user can edit) ----------
 def default_tax_spec(country: str) -> TaxSpec:
     c = country.lower()
     if c == "uk":
@@ -85,14 +82,14 @@ def default_tax_spec(country: str) -> TaxSpec:
                 Bracket(upper=125_140, rate=0.40),
                 Bracket(upper=math.inf, rate=0.45),
             ],
-            taper_start=100_000,  # PA taper
+            taper_start=100_000,
             taper_ratio=0.5,
         )
     if c == "usa":
-        # USA federal only, single filer (simplified baseline). State taxes not included.
+        # Federal only, single filer (simplified). State taxes not included.
         return TaxSpec(
             name="USA (federal, single)",
-            allowance=14_600,  # standard deduction baseline
+            allowance=14_600,
             brackets=[
                 Bracket(upper=11_600, rate=0.10),
                 Bracket(upper=47_150, rate=0.12),
@@ -104,7 +101,7 @@ def default_tax_spec(country: str) -> TaxSpec:
             ],
         )
     if c == "france":
-        # Simplified IRPP with single part (no quotient familial applied)
+        # Simplified IR with one "part" (no quotient familial here)
         return TaxSpec(
             name="France (simplified, 1 part)",
             allowance=0.0,
@@ -117,10 +114,10 @@ def default_tax_spec(country: str) -> TaxSpec:
             ],
         )
     if c == "germany":
-        # Simplified: stepwise approximation to progressive ESt for single taxpayer
+        # Simplified stepwise approximation for singles
         return TaxSpec(
             name="Germany (simplified)",
-            allowance=11_000,  # Grundfreibetrag approx
+            allowance=11_000,
             brackets=[
                 Bracket(upper=62_000, rate=0.14),
                 Bracket(upper=277_000, rate=0.42),
@@ -128,7 +125,6 @@ def default_tax_spec(country: str) -> TaxSpec:
             ],
         )
     if c == "australia":
-        # Simplified resident tax rates + 2% Medicare levy
         return TaxSpec(
             name="Australia (resident)",
             allowance=18_200,
@@ -138,37 +134,39 @@ def default_tax_spec(country: str) -> TaxSpec:
                 Bracket(upper=180_000, rate=0.37),
                 Bracket(upper=math.inf, rate=0.45),
             ],
-            medicare_levy=0.02
+            medicare_levy=0.02,
         )
-    # Custom default is empty; user will edit
     return TaxSpec(
         name="Custom",
         allowance=12_000,
-        brackets=[Bracket(upper=50_000, rate=0.20), Bracket(upper=150_000, rate=0.40), Bracket(upper=math.inf, rate=0.45)]
+        brackets=[
+            Bracket(upper=50_000, rate=0.20),
+            Bracket(upper=150_000, rate=0.40),
+            Bracket(upper=math.inf, rate=0.45),
+        ],
     )
 
-# ----- Helpers to edit in Streamlit -----
+# ---------- Streamlit helpers ----------
 def spec_to_df(spec: TaxSpec) -> pd.DataFrame:
     data = []
     for b in spec.brackets:
         up = (1e12 if math.isinf(b.upper) else b.upper)
         data.append({"upper_limit": float(up), "rate_percent": b.rate * 100})
-    df = pd.DataFrame(data)
-    return df
+    return pd.DataFrame(data)
 
 def df_to_spec(df: pd.DataFrame, allowance: float, base_name: str, extra: dict) -> TaxSpec:
     brackets = []
     for _, row in df.sort_values("upper_limit").iterrows():
-        up = row["upper_limit"]
-        rate = row["rate_percent"] / 100.0
+        up = float(row["upper_limit"])
+        rate = float(row["rate_percent"]) / 100.0
         if up >= 9.9e11:
             up = math.inf
-        brackets.append(Bracket(upper=float(up), rate=float(rate)))
+        brackets.append(Bracket(upper=up, rate=rate))
     return TaxSpec(
         name=base_name,
         allowance=float(allowance),
         brackets=brackets,
         taper_start=extra.get("taper_start"),
         taper_ratio=extra.get("taper_ratio", 0.5),
-        medicare_levy=extra.get("medicare_levy", 0.0)
+        medicare_levy=extra.get("medicare_levy", 0.0),
     )

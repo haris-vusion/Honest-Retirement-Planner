@@ -3,19 +3,18 @@ import pandas as pd
 
 def project_costs(basket_today: dict, cpi_pct: float, drifts_pct: dict, years: int) -> pd.DataFrame:
     """
-    Category-by-category projection.
-    cpi_pct, drifts_pct are percentages (e.g. 2.5).
-    Returns DataFrame with columns: year, category, monthly_nominal, monthly_real_today
+    Inflate each category to each future year.
+    Returns columns: year, category, monthly_nominal, monthly_real_today, annual_nominal, annual_real_today
     """
     cpi = cpi_pct / 100.0
     idx = np.arange(years + 1)
     rows = []
     for cat, m_now in basket_today.items():
         drift = (drifts_pct.get(cat, 0.0) / 100.0)
-        nominal_multiplier = (1 + cpi + drift) ** idx
-        real_divisor = (1 + cpi) ** idx
-        monthly_nominal = m_now * nominal_multiplier
-        monthly_real = monthly_nominal / real_divisor
+        nominal_mult = (1 + cpi + drift) ** idx
+        real_div = (1 + cpi) ** idx
+        monthly_nominal = m_now * nominal_mult
+        monthly_real = monthly_nominal / real_div
         rows.append(pd.DataFrame({
             "year": idx,
             "category": cat,
@@ -35,4 +34,3 @@ def summarize_year(df: pd.DataFrame, year: int) -> dict:
         "annual_nominal": float(sub["annual_nominal"].sum()),
         "annual_real_today": float(sub["annual_real_today"].sum()),
     }
-

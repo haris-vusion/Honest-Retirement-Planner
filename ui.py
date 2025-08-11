@@ -16,20 +16,24 @@ def app_header(title: str, subtitle: str = ""):
         if subtitle:
             st.caption(subtitle)
     with cols[2]:
-        st.markdown("<div class='badge'>Wizard</div> <div class='badge'>Monte Carlo</div> <div class='badge'>Multi-country tax</div>", unsafe_allow_html=True)
+        st.markdown(
+            "<div class='badge'>Wizard</div> "
+            "<div class='badge'>Monte Carlo</div> "
+            "<div class='badge'>Multi-country tax</div>",
+            unsafe_allow_html=True,
+        )
 
 def step_header(step: int, title: str, explainer: str):
     st.markdown(f"### Step {step}: {title}")
     st.write(explainer)
 
-def nav_buttons():
-    col1, col2 = st.columns(2)
-    back = col1.button("⬅️ Back")
-    next_ = col2.button("Next ➡️", type="primary")
-    return back, next_
-
-def run_button(label="Run my plan"):
-    return st.button(label, type="primary", use_container_width=True)
-
 def small_help(text: str):
     st.caption(text)
+
+def nav_row(back_to: int = None, next_label="Save & Next →"):
+    cols = st.columns([1,1,6])
+    back_clicked = False
+    if back_to is not None:
+        back_clicked = cols[0].form_submit_button("⬅️ Back", use_container_width=True)
+    submit = cols[1].form_submit_button(next_label, type="primary", use_container_width=True)
+    return back_clicked, submit
