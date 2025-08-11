@@ -245,6 +245,8 @@ tax_factor = (1 + cpi) ** max(0, (retire_age - current_age))
 sys_at_retire = index_tax(SYSTEMS[country], tax_factor)
 rule_start_income_net_real = net_from_gross(rule_start_income_gross_real, sys_at_retire)
 
+basket_nominal_retire = float(b["annual_nominal"])
+
 c1, c2, c3 = st.columns(3)
 c1.markdown(
     f"<div class='card'><div class='caption'>Success probability "
@@ -259,11 +261,13 @@ c2.markdown(
     unsafe_allow_html=True
 )
 c3.markdown(
-    f"<div class='card'><div class='caption'>Basket at retirement (real)</div>"
-    f"<div class='kpi'>£{summary['target_annual_real']:,.0f}/yr</div>"
-    f"<div class='caption'>Target net spend (today’s money)</div></div>",
+    f"<div class='card'><div class='caption'>Basket at retirement (nominal)</div>"
+    f"<div class='kpi'>£{basket_nominal_retire:,.0f}/yr</div>"
+    f"<div class='caption'>This is the sticker price in your retirement year</div></div>",
     unsafe_allow_html=True
 )
+
+# (keep this explanatory caption below if you like)
 st.caption(f"After-tax rule-based starting income (real): £{rule_start_income_net_real:,.0f}/yr, using {country} tax at retirement-year brackets.")
 
 # ------------- Charts -------------
