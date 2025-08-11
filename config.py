@@ -59,7 +59,7 @@ DEFAULTS = {
     },
 
     # Sims
-    "num_paths": 5000,
+    "num_paths": 3,
     "seed": 123,
 
     # Taxes (indexed with inflation in sim)
