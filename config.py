@@ -35,13 +35,13 @@ DEFAULTS = {
 
     # Category drifts vs CPI (positive = tends to outpace CPI)
     "category_drifts": {
-        "housing": 0.01,
-        "food": 0.02,
-        "energy": 0.01,
-        "transport": 0.02,
-        "health": 0.01,
-        "entertainment": 0.025,
-        "other": 0.02
+        "housing": 0.028,
+        "food": 0.036,
+        "energy": 0.05,
+        "transport": 0.017,
+        "health": 0.045,
+        "entertainment": 0.033,
+        "other": 0.036
     },
 
     # Drawdown
