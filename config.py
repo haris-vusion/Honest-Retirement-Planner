@@ -15,7 +15,7 @@ DEFAULTS = {
     "contrib_growth_nominal_pct": 2.0,  # per year
 
     # Asset returns (real, after-inflation). You can pick a preset later.
-    "exp_real_return": 0.05,   # long-run real
+    "exp_real_return": 0.1,   # long-run real
     "volatility": 0.16,        # annualized
     "fees_annual": 0.002,      # 0.20%
 
