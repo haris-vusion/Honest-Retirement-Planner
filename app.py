@@ -164,7 +164,7 @@ b = basket(proj_full, years_to_retire)
 basket_today_monthly = sum(spend_today.values())
 basket_today_annual = basket_today_monthly * 12
 
-cols_kpi = st.columns(5)
+cols_kpi = st.columns(4)
 cols_kpi[0].markdown(
     f"<div class='card'><div class='caption'>Basket today (monthly)</div>"
     f"<div class='kpi'>£{basket_today_monthly:,.0f}</div></div>", unsafe_allow_html=True)
@@ -175,9 +175,6 @@ cols_kpi[2].markdown(
     f"<div class='card'><div class='caption'>Monthly basket at retirement (nominal)</div>"
     f"<div class='kpi'>£{b['monthly_nominal']:,.0f}</div></div>", unsafe_allow_html=True)
 cols_kpi[3].markdown(
-    f"<div class='card'><div class='caption'>Monthly basket in today’s money (at retirement)</div>"
-    f"<div class='kpi'>£{b['monthly_real_today']:,.0f}</div></div>", unsafe_allow_html=True)
-cols_kpi[4].markdown(
     f"<div class='card'><div class='caption'>Annual basket (nominal, at retirement)</div>"
     f"<div class='kpi'>£{b['annual_nominal']:,.0f}</div></div>", unsafe_allow_html=True)
 
