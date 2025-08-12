@@ -38,7 +38,7 @@ retire_age = st.sidebar.number_input(
     help="Pick the age you’d like to stop full-time work."
 )
 plan_end_age = st.sidebar.number_input(
-    "Plan until age", min_value=retire_age+5, max_value=105, value=DEFAULTS["plan_end_age"],
+    "Plan until age", min_value=retire_age+5, max_value=130, value=DEFAULTS["plan_end_age"],
     help="We simulate until this age. It’s your longevity buffer."
 )
 

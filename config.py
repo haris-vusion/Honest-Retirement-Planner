@@ -10,8 +10,8 @@ DEFAULTS = {
     "country": "United Kingdom",  # United Kingdom / United States / France / Germany / Australia
 
     # Portfolio & saving (today)
-    "current_investable": 20000,
-    "monthly_contrib": 800,
+    "current_investable": 5000,
+    "monthly_contrib": 100,
     "contrib_growth_nominal_pct": 2.0,  # per year
 
     # Asset returns (real, after-inflation). You can pick a preset later.
@@ -36,12 +36,12 @@ DEFAULTS = {
     # Category drifts vs CPI (positive = tends to outpace CPI)
     "category_drifts": {
         "housing": 0.01,
-        "food": 0.005,
+        "food": 0.02,
         "energy": 0.01,
-        "transport": 0.0,
+        "transport": 0.02,
         "health": 0.01,
-        "entertainment": 0.0,
-        "other": 0.0
+        "entertainment": 0.025,
+        "other": 0.02
     },
 
     # Drawdown
